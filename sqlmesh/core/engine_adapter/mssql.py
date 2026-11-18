@@ -104,6 +104,7 @@ class MSSQLEngineAdapter(
                 "CHARACTER_MAXIMUM_LENGTH",
                 "NUMERIC_PRECISION",
                 "NUMERIC_SCALE",
+                "DATETIME_PRECISION",
             )
             .from_("INFORMATION_SCHEMA.COLUMNS")
             .where(f"TABLE_NAME = '{table.name}'")
@@ -120,6 +121,7 @@ class MSSQLEngineAdapter(
             character_maximum_length: t.Optional[int] = None,
             numeric_precision: t.Optional[int] = None,
             numeric_scale: t.Optional[int] = None,
+            datetime_precision: t.Optional[int] = None,
         ) -> tuple:
             data_type = data_type.lower()
             if (
@@ -138,6 +140,11 @@ class MSSQLEngineAdapter(
                 return (column_name, f"{data_type}({numeric_precision}, {numeric_scale})")
             if data_type == "float":
                 return (column_name, f"{data_type}({numeric_precision})")
+            if (
+                data_type in ("time", "datetime2", "datetimeoffset")
+                and datetime_precision is not None
+            ):
+                return (column_name, f"{data_type}({datetime_precision})")
 
             return (column_name, data_type)
 

@@ -1,0 +1,71 @@
+{
+  "author_repro": {
+    "sql": [
+      "ALTER TABLE t ADD c BIT",
+      "ALTER TABLE t DROP COLUMN v",
+      "ALTER TABLE t ADD v DATETIME2(6)"
+    ],
+    "destructive": true,
+    "expected": "only ADD c",
+    "pass": false
+  },
+  "synthetic_scd_history": {
+    "fabric_sql": [
+      "ALTER TABLE t ADD cancelled_flag BIT",
+      "ALTER TABLE t DROP COLUMN _dwh_valid_from",
+      "ALTER TABLE t ADD _dwh_valid_from DATETIME2(6)",
+      "ALTER TABLE t DROP COLUMN _dwh_valid_to",
+      "ALTER TABLE t ADD _dwh_valid_to DATETIME2(6)"
+    ],
+    "before": [
+      [
+        1,
+        "2026-01-01 00:00:00.123456",
+        "2026-02-01 00:00:00.654321"
+      ],
+      [
+        1,
+        "2026-02-01 00:00:00.654321",
+        null
+      ],
+      [
+        2,
+        "2026-03-01 00:00:00.000001",
+        null
+      ]
+    ],
+    "after": [
+      [
+        1,
+        null,
+        null
+      ],
+      [
+        1,
+        null,
+        null
+      ],
+      [
+        2,
+        null,
+        null
+      ]
+    ],
+    "expected": "only ADD cancelled_flag; all three history rows unchanged",
+    "pass": false
+  },
+  "tsql_metadata": {
+    "query": "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 't' AND [TABLE_SCHEMA] = 'dbo';",
+    "type_sql": "DATETIME2",
+    "explicit_precision": "[]",
+    "expected": "explicit DATETIME2(6)",
+    "pass": false
+  },
+  "fabric_metadata": {
+    "query": "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 't' AND [TABLE_SCHEMA] = 'dbo';",
+    "type_sql": "DATETIME2(6)",
+    "explicit_precision": "[]",
+    "expected": "explicit DATETIME2(6)",
+    "pass": false
+  }
+}

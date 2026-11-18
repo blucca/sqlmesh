@@ -30,27 +30,27 @@ def adapter(make_mocked_engine_adapter: t.Callable) -> MSSQLEngineAdapter:
 
 def test_columns(adapter: MSSQLEngineAdapter):
     adapter.cursor.fetchall.return_value = [
-        ("decimal_ps", "decimal", None, 5, 4),
-        ("decimal", "decimal", None, 18, 0),
-        ("numeric_ps", "numeric", None, 5, 4),
-        ("numeric", "numeric", None, 18, 0),
-        ("float_n", "real", None, 24, None),
-        ("float", "float", None, 53, None),
-        ("binary_n", "binary", 10, None, None),
-        ("binary", "binary", 1, None, None),
-        ("var_binary_n", "varbinary", 10, None, None),
-        ("var_binary_max", "varbinary", -1, None, None),
-        ("var_binary", "varbinary", 1, None, None),
-        ("char_n", "char", 10, None, None),
-        ("char", "char", 1, None, None),
-        ("varchar_n", "varchar", 10, None, None),
-        ("varchar_max", "varchar", -1, None, None),
-        ("varchar", "varchar", 1, None, None),
-        ("nchar_n", "nchar", 10, None, None),
-        ("nchar", "nchar", 1, None, None),
-        ("nvarchar_n", "nvarchar", 10, None, None),
-        ("nvarchar", "nvarchar", 1, None, None),
-        ("nvarchar_max", "nvarchar", -1, None, None),
+        ("decimal_ps", "decimal", None, 5, 4, None),
+        ("decimal", "decimal", None, 18, 0, None),
+        ("numeric_ps", "numeric", None, 5, 4, None),
+        ("numeric", "numeric", None, 18, 0, None),
+        ("float_n", "real", None, 24, None, None),
+        ("float", "float", None, 53, None, None),
+        ("binary_n", "binary", 10, None, None, None),
+        ("binary", "binary", 1, None, None, None),
+        ("var_binary_n", "varbinary", 10, None, None, None),
+        ("var_binary_max", "varbinary", -1, None, None, None),
+        ("var_binary", "varbinary", 1, None, None, None),
+        ("char_n", "char", 10, None, None, None),
+        ("char", "char", 1, None, None, None),
+        ("varchar_n", "varchar", 10, None, None, None),
+        ("varchar_max", "varchar", -1, None, None, None),
+        ("varchar", "varchar", 1, None, None, None),
+        ("nchar_n", "nchar", 10, None, None, None),
+        ("nchar", "nchar", 1, None, None, None),
+        ("nvarchar_n", "nvarchar", 10, None, None, None),
+        ("nvarchar", "nvarchar", 1, None, None, None),
+        ("nvarchar_max", "nvarchar", -1, None, None, None),
     ]
 
     assert adapter.columns("db.table") == {
@@ -78,7 +78,7 @@ def test_columns(adapter: MSSQLEngineAdapter):
     }
 
     adapter.cursor.execute.assert_called_once_with(
-        """SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"""
+        """SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"""
     )
 
 
@@ -1055,3 +1055,21 @@ def test_comments(make_mocked_engine_adapter: t.Callable, mocker: MockerFixture)
         adapter._build_create_comment_table_exp(table, comment),
         adapter._build_create_comment_column_exp(table, "a", comment),
     ]
+
+
+@pytest.mark.parametrize("data_type", ["time", "datetime2", "datetimeoffset"])
+@pytest.mark.parametrize("precision", [0, 6, 7, None])
+def test_columns_temporal_precision(
+    adapter: MSSQLEngineAdapter, data_type: str, precision: t.Optional[int]
+):
+    adapter.cursor.fetchall.return_value = [("v", data_type, None, None, None, precision)]
+    expected_type = data_type if precision is None else f"{data_type}({precision})"
+
+    assert adapter.columns("db.table") == {
+        "v": exp.DataType.build(expected_type, dialect=adapter.dialect)
+    }
+    adapter.cursor.execute.assert_called_once_with(
+        "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], "
+        "[NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] "
+        "FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"
+    )

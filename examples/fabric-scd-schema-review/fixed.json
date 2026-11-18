@@ -1,0 +1,65 @@
+{
+  "author_repro": {
+    "sql": [
+      "ALTER TABLE t ADD c BIT"
+    ],
+    "destructive": false,
+    "expected": "only ADD c",
+    "pass": true
+  },
+  "synthetic_scd_history": {
+    "fabric_sql": [
+      "ALTER TABLE t ADD cancelled_flag BIT"
+    ],
+    "before": [
+      [
+        1,
+        "2026-01-01 00:00:00.123456",
+        "2026-02-01 00:00:00.654321"
+      ],
+      [
+        1,
+        "2026-02-01 00:00:00.654321",
+        null
+      ],
+      [
+        2,
+        "2026-03-01 00:00:00.000001",
+        null
+      ]
+    ],
+    "after": [
+      [
+        1,
+        "2026-01-01 00:00:00.123456",
+        "2026-02-01 00:00:00.654321"
+      ],
+      [
+        1,
+        "2026-02-01 00:00:00.654321",
+        null
+      ],
+      [
+        2,
+        "2026-03-01 00:00:00.000001",
+        null
+      ]
+    ],
+    "expected": "only ADD cancelled_flag; all three history rows unchanged",
+    "pass": true
+  },
+  "tsql_metadata": {
+    "query": "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 't' AND [TABLE_SCHEMA] = 'dbo';",
+    "type_sql": "DATETIME2(6)",
+    "explicit_precision": "[DataTypeParam(\n  this=Literal(this=6, is_string=False))]",
+    "expected": "explicit DATETIME2(6)",
+    "pass": true
+  },
+  "fabric_metadata": {
+    "query": "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 't' AND [TABLE_SCHEMA] = 'dbo';",
+    "type_sql": "DATETIME2(6)",
+    "explicit_precision": "[DataTypeParam(\n  this=Literal(this=6, is_string=False))]",
+    "expected": "explicit DATETIME2(6)",
+    "pass": true
+  }
+}

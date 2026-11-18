@@ -28,6 +28,10 @@ class FabricEngineAdapter(MSSQLEngineAdapter):
     """
 
     DIALECT = "fabric"
+    SCHEMA_DIFFER_KWARGS = {
+        **MSSQLEngineAdapter.SCHEMA_DIFFER_KWARGS,
+        "dialect": DIALECT,
+    }
     SUPPORTS_INDEXES = False
     SUPPORTS_TRANSACTIONS = False
     SUPPORTS_CREATE_DROP_CATALOG = True

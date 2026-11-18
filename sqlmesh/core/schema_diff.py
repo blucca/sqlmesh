@@ -356,6 +356,7 @@ class SchemaDiffer(PydanticModel):
             be set outside of that context.
     """
 
+    dialect: str = ""
     support_positional_add: bool = False
     nested_support: NestedSupport = NestedSupport.NONE
     array_element_selector: str = ""
@@ -702,7 +703,11 @@ class SchemaDiffer(PydanticModel):
             _, new_type = _get_name_and_type(new_kwarg)
             _, current_type = _get_name_and_type(current_kwarg)
             columns = parent_columns + [TableAlterColumn.from_struct_kwarg(current_kwarg)]
-            if new_type == current_type:
+            # Fabric aliases can share the same physical type. Other dialects keep AST comparison.
+            if new_type == current_type or (
+                self.dialect == "fabric"
+                and new_type.sql(self.dialect) == current_type.sql(self.dialect)
+            ):
                 continue
             operations.extend(
                 self._alter_operation(

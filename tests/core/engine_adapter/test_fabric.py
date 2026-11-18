@@ -188,12 +188,12 @@ def test_switching_between_catalogs_closes_each_time(
 
 def test_columns(adapter: FabricEngineAdapter):
     adapter.cursor.fetchall.return_value = [
-        ("decimal_ps", "decimal", None, 5, 4),
-        ("decimal", "decimal", None, 18, 0),
-        ("float", "float", None, 53, None),
-        ("char_n", "char", 10, None, None),
-        ("varchar_n", "varchar", 10, None, None),
-        ("nvarchar_max", "nvarchar", -1, None, None),
+        ("decimal_ps", "decimal", None, 5, 4, None),
+        ("decimal", "decimal", None, 18, 0, None),
+        ("float", "float", None, 53, None, None),
+        ("char_n", "char", 10, None, None, None),
+        ("varchar_n", "varchar", 10, None, None, None),
+        ("nvarchar_max", "nvarchar", -1, None, None, None),
     ]
 
     assert adapter.columns("db.table") == {
@@ -207,7 +207,7 @@ def test_columns(adapter: FabricEngineAdapter):
 
     # Verify that the adapter queries the uppercase INFORMATION_SCHEMA
     adapter.cursor.execute.assert_called_once_with(
-        """SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"""
+        """SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], [NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"""
     )
 
 
@@ -494,3 +494,21 @@ def test_create_warehouse_unrelated_conflict_still_raises(
 
     with pytest.raises(requests.HTTPError):
         fabric_http_client.create_warehouse("my_warehouse")
+
+
+@pytest.mark.parametrize("data_type", ["time", "datetime2", "datetimeoffset"])
+@pytest.mark.parametrize("precision", [0, 6, None])
+def test_columns_temporal_precision(
+    adapter: FabricEngineAdapter, data_type: str, precision: t.Optional[int]
+):
+    adapter.cursor.fetchall.return_value = [("v", data_type, None, None, None, precision)]
+    expected_type = data_type if precision is None else f"{data_type}({precision})"
+
+    assert adapter.columns("db.table") == {
+        "v": exp.DataType.build(expected_type, dialect=adapter.dialect)
+    }
+    adapter.cursor.execute.assert_called_once_with(
+        "SELECT [COLUMN_NAME], [DATA_TYPE], [CHARACTER_MAXIMUM_LENGTH], "
+        "[NUMERIC_PRECISION], [NUMERIC_SCALE], [DATETIME_PRECISION] "
+        "FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE [TABLE_NAME] = 'table' AND [TABLE_SCHEMA] = 'db';"
+    )

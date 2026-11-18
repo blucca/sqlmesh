@@ -2366,3 +2366,84 @@ def test_drop_operation_missing_column_error():
         str(error_message.value)
         == "Cannot drop column 'missing_column' from table 'test_table' - column not found. This may indicate a mismatch between the expected and actual table schemas."
     )
+
+
+@pytest.mark.parametrize("use_adapter", [False, True], ids=["factory", "adapter"])
+def test_fabric_scd2_managed_columns_preserve_history_schema(use_adapter: bool):
+    # Regression for fresioAS's Fabric SCD2 deployment report in issue #6224.
+    schema_differ = (
+        create_engine_adapter(lambda: None, "fabric").schema_differ
+        if use_adapter
+        else get_schema_differ("fabric")
+    )
+    current = {
+        "id": exp.DataType.build("INT", dialect="fabric"),
+        "_dwh_valid_from": exp.DataType.build("DATETIME2(6)", dialect="fabric"),
+        "_dwh_valid_to": exp.DataType.build("DATETIME2(6)", dialect="fabric"),
+    }
+    new = {
+        "id": exp.DataType.build("INT", dialect="fabric"),
+        "_dwh_valid_from": exp.DataType.build("TIMESTAMP"),
+        "_dwh_valid_to": exp.DataType.build("TIMESTAMP"),
+        "cancelled_flag": exp.DataType.build("BIT", dialect="fabric"),
+    }
+
+    operations = schema_differ.compare_columns("t", current, new)
+
+    assert len(operations) == 1
+    assert isinstance(operations[0], TableAlterAddColumnOperation)
+    assert operations[0].column.name == "cancelled_flag"
+    assert operations[0].column_type.sql("fabric") == "BIT"
+    assert not operations[0].is_destructive
+
+
+@pytest.mark.parametrize(
+    "current_type, new_type",
+    [
+        ("DATETIME2(6)", "TIMESTAMP"),
+        ("DATETIME2(6)", "TIMESTAMP(6)"),
+        ("DATETIME2(5)", "TIMESTAMP(5)"),
+        ("DATETIME2(6)", "DATETIME2"),
+        ("TIME(6)", "TIME"),
+    ],
+)
+def test_fabric_temporal_physical_type_equivalence(current_type: str, new_type: str):
+    current = {"v": exp.DataType.build(current_type, dialect="fabric")}
+    new = {"v": exp.DataType.build(new_type, dialect="fabric" if new_type == "DATETIME2" else None)}
+
+    assert get_schema_differ("fabric").compare_columns("t", current, new) == []
+
+
+@pytest.mark.parametrize("current_precision, new_precision", [(5, 6), (6, 5)])
+def test_fabric_temporal_equivalence_preserves_real_precision_changes(
+    current_precision: int, new_precision: int
+):
+    current = {"v": exp.DataType.build(f"DATETIME2({current_precision})", dialect="fabric")}
+    new = {"v": exp.DataType.build(f"DATETIME2({new_precision})", dialect="fabric")}
+
+    assert get_schema_differ("fabric").compare_columns("t", current, new)
+
+
+def test_fabric_temporal_equivalence_preserves_tsql_rowversion():
+    current = {"v": exp.DataType.build("DATETIME2(6)", dialect="tsql")}
+    new = {"v": exp.DataType.build("TIMESTAMP", dialect="tsql")}
+
+    assert new["v"].is_type(exp.DataType.Type.ROWVERSION)
+    operations = get_schema_differ("mssql").compare_columns("t", current, new)
+    assert any(operation.is_destructive for operation in operations)
+    assert get_schema_differ("fabric").compare_columns("t", current, new)
+
+
+def test_fabric_temporal_equivalence_in_nested_structs():
+    schema_differ = get_schema_differ("fabric", {"nested_support": NestedSupport.ALL})
+    current = {
+        "payload": exp.DataType.build("STRUCT<_dwh_valid_from DATETIME2(6)>", dialect="fabric")
+    }
+    new = {"payload": exp.DataType.build("STRUCT<_dwh_valid_from TIMESTAMP, added INT>")}
+
+    operations = schema_differ.compare_columns("t", current, new)
+
+    assert len(operations) == 1
+    assert isinstance(operations[0], TableAlterAddColumnOperation)
+    assert [column.name for column in operations[0].column_parts] == ["payload", "added"]
+    assert not operations[0].is_destructive
